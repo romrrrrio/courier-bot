@@ -1,136 +1,125 @@
-import os
 import telebot
-from telebot import types
+from datetime import datetime, timedelta
 
-# Токен вашого бота вже вставлено
-TOKEN = "9082226158:AAGIRe-wteR51j1vI8USvIdVuuC5pkWGmec"
-bot = telebot.TeleBot(TOKEN)
+API_TOKEN = 'ВАШ_ТОКЕН_БОТА'
+bot = telebot.TeleBot(API_TOKEN)
 
-# Проста структура даних для обліку
-user_data = {
-    "probig": 0,
-    "tochky": 0,
-    "zapravka": 0,
-    "bak": 50.0,  # Початковий залишок палива
-}
+# Налаштування розцінок та витрати палива
+RATE_PER_KM = 1.0       # Гривень за кілометр
+RATE_PER_POINT = 15.0    # Гривень за точку
+FUEL_CONSUMPTION = 10.0  # Літрів на 100 км
+FUEL_PRICE = 50.0        # Ціна за літр палива
 
+# Словники для збереження стану користувачів
+user_fuel = {}
+user_data_entry = {}
 
-@bot.message_handler(commands=["start"])
-def send_welcome(markup_message):
-  markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-  markup.add(
-      types.KeyboardButton("📊 Додати заїзд"),
-      types.KeyboardButton("⛽ Заправка"),
-  )
-  markup.add(
-      types.KeyboardButton("📈 Звіт за місяць"),
-      types.KeyboardButton("🔄 Новий місяць"),
-  )
+def get_markup():
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row('Додати заїзд', 'Заправка')
+    markup.row('Встановити паливо', 'Звіт за місяць')
+    return markup
 
-  bot.send_message(
-      markup_message.chat.id,
-      "Привіт! Я твій бот-помічник для обліку заробітку кур'єра.\nОбери"
-      " необхідну дію на клавіатурі нижче:",
-      reply_markup=markup,
-  )
-
-
-@bot.message_handler(
-    func=lambda message: message.text in [
-        "📊 Додати заїзд",
-        "⛽ Заправка",
-        "📈 Звіт за місяць",
-        "🔄 Новий місяць",
-    ]
-)
-def handle_menu(message):
-  if message.text == "📊 Додати заїзд":
-    sent_msg = bot.send_message(
-        message.chat.id,
-        "Введи дані через пробіл:\n👉 **Кілометри Точки**\n(наприклад: `120"
-        " 8`)",
-        parse_mode="Markdown",
-    )
-    bot.register_next_step_handler(sent_msg, process_trip)
-
-  elif message.text == "⛽ Заправка":
-    sent_msg = bot.send_message(
-        message.chat.id, "Скільки літрів заправив? (наприклад: `15`)"
-    )
-    bot.register_next_step_handler(sent_msg, process_refuel)
-
-  elif message.text == "📈 Звіт за місяць":
-    zarobitok_km = user_data["probig"] * 3
-    zarobitok_tochky = user_data["tochky"] * 15
-    vsego = zarobitok_km + zarobitok_tochky
-
-    report = (
-        f"📊 **Звіт за поточний місяць:**\n\n🛣 Пробіг: {user_data['probig']}"
-        f" км\n📍 Точки: {user_data['tochky']}\n\n💰 За кілометри: {zarobitok_km}"
-        f" грн\n💰 За точки: {zarobitok_tochky} грн\n🏆 **Всього зароблено:"
-        f" {vsego} грн**\n\n⛽ Заправлено палива: {user_data['zapravka']}"
-        f" л\n🚗 Залишок в баку: {user_data['bak']:.1f} л"
-    )
-    bot.send_message(message.chat.id, report, parse_mode="Markdown")
-
-  elif message.text == "🔄 Новий місяць":
-    user_data["probig"] = 0
-    user_data["tochky"] = 0
-    user_data["zapravka"] = 0
-    bot.send_message(
-        message.chat.id,
-        "🔄 Дані місяця очищено! Залишок палива в баку збережено.",
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    user_fuel.setdefault(message.chat.id, 50.0) # Початкові 50 літрів за замовчуванням
+    bot.reply_to(
+        message,
+        "Привіт! Я бот для обліку роботи кур'єра. Оберіть дію на клавіатурі:",
+        reply_markup=get_markup()
     )
 
+@bot.message_handler(commands=['set_fuel'])
+@bot.message_handler(func=lambda message: message.text == 'Встановити паливо')
+def set_fuel_start(message):
+    bot.send_message(message.chat.id, "Вкажіть поточний залишок палива в баку (в літрах):")
+    user_data_entry[message.chat.id] = 'wait_fuel'
 
-def process_trip(message):
-  try:
-    parts = message.text.split()
-    km = float(parts[0])
-    tochky = int(parts[1])
+@bot.message_handler(func=lambda message: message.chat.id in user_data_entry and user_data_entry[message.chat.id] == 'wait_fuel')
+def set_fuel_process(message):
+    try:
+        fuel = float(message.text.replace(',', '.'))
+        if fuel < 0:
+            raise ValueError
+        user_fuel[message.chat.id] = fuel
+        del user_data_entry[message.chat.id]
+        bot.send_message(message.chat.id, f"Залишок палива оновлено: {fuel:.1f} л.", reply_markup=get_markup())
+    except ValueError:
+        bot.send_message(message.chat.id, "Некоректне значення. Вкажіть число:")
 
-    user_data["probig"] += km
-    user_data["tochky"] += tochky
+@bot.message_handler(func=lambda message: message.text in ['Додати заїзд', 'Заправка'])
+def action_selection(message):
+    if message.text == 'Додати заїзд':
+        bot.send_message(message.chat.id, "Введіть дані у форматі: [дата] [км] [точки]\nПриклад для сьогодні: 120 5\nПриклад для вчора: 11.09 100 3")
+        user_data_entry[message.chat.id] = 'wait_ride'
+    elif message.text == 'Заправка':
+        bot.send_message(message.chat.id, "Введіть кількість заправлених літрів:")
+        user_data_entry[message.chat.id] = 'wait_refuel'
 
-    # Витрата палива: 8л на 100 км (0.08 л на 1 км)
-    palyno_vytrata = km * 0.08
-    user_data["bak"] -= palyno_vytrata
+@bot.message_handler(func=lambda message: message.chat.id in user_data_entry and user_data_entry[message.chat.id] in ['wait_ride', 'wait_refuel'])
+def process_custom_input(message):
+    action = user_data_entry[message.chat.id]
+    text = message.text.strip()
+    
+    if action == 'wait_refuel':
+        try:
+            liters = float(text.replace(',', '.'))
+            current_fuel = user_fuel.get(message.chat.id, 0.0)
+            new_fuel = current_fuel + liters
+            user_fuel[message.chat.id] = new_fuel
+            del user_data_entry[message.chat.id]
+            bot.send_message(message.chat.id, f"Заправку додано! В баку тепер: {new_fuel:.1f} л.", reply_markup=get_markup())
+        except ValueError:
+            bot.send_message(message.chat.id, "Помилка! Введіть коректну кількість літрів.")
+            
+    elif action == 'wait_ride':
+        parts = text.split()
+        if len(parts) >= 3:
+            date_str = parts[0]
+            try:
+                km = float(parts[1])
+                points = int(parts[2])
+                date_obj = datetime.strptime(date_str, "%d.%m").replace(year=datetime.now().year)
+            except ValueError:
+                bot.send_message(message.chat.id, "Помилка формату даних. Перевірте числа.")
+                return
+        elif len(parts) == 2:
+            date_obj = datetime.now()
+            try:
+                km = float(parts[0])
+                points = int(parts[1])
+            except ValueError:
+                bot.send_message(message.chat.id, "Помилка формату чисел.")
+                return
+        else:
+            bot.send_message(message.chat.id, "Недостатньо даних. Введіть за зразком.")
+            return
 
-    zar_d(message, km, tochky, palyno_vytrata)
-  except Exception:
-    bot.send_message(
-        message.chat.id, "❌ Помилка! Введи два числа через пробіл, наприклад: 120 8"
-    )
+        del user_data_entry[message.chat.id]
+        
+        # Розрахунки
+        earned_km = km * RATE_PER_KM
+        earned_points = points * RATE_PER_POINT
+        daily_total = earned_km + earned_points
+        
+        fuel_used = (km / 100) * FUEL_CONSUMPTION
+        current_fuel = user_fuel.get(message.chat.id, 0.0)
+        remaining_fuel = max(0.0, current_fuel - fuel_used)
+        user_fuel[message.chat.id] = remaining_fuel
+        
+        response = (
+            f"✅ Запис за {date_obj.strftime('%d.%m')} додано!\n"
+            f"• За км: {earned_km:.1f} грн\n"
+            f"• За точки: {earned_points:.1f} грн\n"
+            f"• Всього за день: {daily_total:.1f} грн\n"
+            f"• Витрачено палива: {fuel_used:.1f} л\n"
+            f"• Залишок в баку: {remaining_fuel:.1f} л"
+        )
+        bot.send_message(message.chat.id, response, reply_markup=get_markup())
 
+@bot.message_handler(func=lambda message: message.text == 'Звіт за місяць')
+def send_report(message):
+    current_fuel = user_fuel.get(message.chat.id, 0.0)
+    bot.send_message(message.chat.id, f"📊 Статистика:\nПоточний залишок палива: {current_fuel:.1f} л.\n(Повний функціонал бази даних підключіть за потреби).", reply_markup=get_markup())
 
-def process_refuel(message):
-  try:
-    litriv = float(message.text)
-    user_data["zapravka"] += litriv
-    user_data["bak"] += litriv
-    bot.send_message(
-        message.chat.id,
-        f"✅ Успішно заправлено {litriv} л.\n🚗 Залишок в баку:"
-        f" {user_data['bak']:.1f} л",
-    )
-  except Exception:
-    bot.send_message(
-        message.chat.id, "❌ Помилка! Введи число, наприклад: 15"
-    )
-
-
-def zar_d(message, km, tochky, palyno_vytrata):
-  z_km = km * 3
-  z_toch = tochky * 15
-  vsego_d = z_km + z_toch
-  bot.send_message(
-      message.chat.id,
-      f"✅ Запис додано!\n• За км: {z_km} грн\n• За точки: {z_toch}"
-      f" грн\n• За день: **{vsego_d} грн**\n• Витрачено палива:"
-      f" {palyno_vytrata:.1f} л\n• Залишок в баку: {user_data['bak']:.1f} л",
-      parse_mode="Markdown",
-  )
-
-
-if __name__ == "__main__":
-  bot.infinity_polling()
+bot.infinity_polling()
