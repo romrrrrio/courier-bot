@@ -99,6 +99,7 @@ def get_markup():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("📊 Додати заїзд", "⛽ Заправка")
     markup.row("📈 Звіт за місяць", "🔄 Новий місяць")
+    markup.row("⛽ Оновити паливо")
     return markup
 
 
@@ -114,7 +115,7 @@ def parse_positive_number(value, allow_zero=False):
 def parse_ride(text):
     """
     Формати:
-      120 5          — сьогодні, 120 км, 5 точок
+      120 5        — сьогодні, 120 км, 5 точок
       09.11 100 3    — 9 листопада поточного року, 100 км, 3 точки
       09.11.2026 100 3 — повна дата
     """
@@ -174,6 +175,11 @@ def set_fuel_command(message):
         message.chat.id,
         "Введи фактичний залишок палива в літрах. Для скасування — /cancel."
     )
+
+
+@bot.message_handler(func=lambda m: m.text == "⛽ Оновити паливо")
+def update_fuel_button(message):
+    set_fuel_command(message)
 
 
 @bot.message_handler(func=lambda m: m.text == "🔄 Новий місяць" or m.text == "Новий місяць")
