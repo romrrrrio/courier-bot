@@ -1,7 +1,7 @@
 import telebot
 from datetime import datetime, timedelta
 
-API_TOKEN = 9082226158:AAGIRe-wteR51j1vI8USvIdVuuC5pkWGmec
+API_TOKEN = "9082226158:AAGIRe-wteR51j1vI8USvIdVuuC5pkWGmec"
 bot = telebot.TeleBot(API_TOKEN)
 
 # Налаштування розцінок та витрати палива
