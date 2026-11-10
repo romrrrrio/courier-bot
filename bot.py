@@ -8,7 +8,7 @@ bot = telebot.TeleBot(API_TOKEN)
 RATE_PER_KM = 3.0       # Гривень за кілометр
 RATE_PER_POINT = 15.0    # Гривень за точку
 FUEL_CONSUMPTION = 8.0  # Літрів на 100 км
-FUEL_PRICE = 50.0        # Ціна за літр палива
+FUEL_PRICE = 87.0        # Ціна за літр палива
 
 # Словники для збереження стану користувачів
 user_fuel = {}
