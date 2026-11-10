@@ -5,9 +5,9 @@ API_TOKEN = 9082226158:AAGIRe-wteR51j1vI8USvIdVuuC5pkWGmec
 bot = telebot.TeleBot(API_TOKEN)
 
 # Налаштування розцінок та витрати палива
-RATE_PER_KM = 1.0       # Гривень за кілометр
+RATE_PER_KM = 3.0       # Гривень за кілометр
 RATE_PER_POINT = 15.0    # Гривень за точку
-FUEL_CONSUMPTION = 10.0  # Літрів на 100 км
+FUEL_CONSUMPTION = 8.0  # Літрів на 100 км
 FUEL_PRICE = 50.0        # Ціна за літр палива
 
 # Словники для збереження стану користувачів
@@ -22,7 +22,7 @@ def get_markup():
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    user_fuel.setdefault(message.chat.id, 50.0) # Початкові 50 літрів за замовчуванням
+    user_fuel.setdefault(message.chat.id, 0.0) # Початкові літри за замовчуванням
     bot.reply_to(
         message,
         "Привіт! Я оновлений бот кур'єра. Оберіть дію:",
