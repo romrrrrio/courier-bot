@@ -7,7 +7,7 @@ import telebot
 from telebot import types
 
 # Вбудований токен Telegram-бота
-API_TOKEN = "9082226158:AAGIRe-wteR51j1vI8USvIdVuuC5pkWGmec"
+API_TOKEN = "9082226158:AAEn1obT8GhBOjJwBOmQX0uoVTjYfLkfULs"
 
 bot = telebot.TeleBot(API_TOKEN)
 
